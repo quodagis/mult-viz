@@ -57,13 +57,20 @@
     font-size: 15px;
     min-height: 44px;
   }
-  #highlight-controls {
-    gap: 8px;
+  #highlight-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+    padding: 4px 0 0 0;
   }
-  #highlight-controls .hl-label {
+  #highlight-section .hl-label {
     color: #787878;
     font-size: 13px;
-    margin-right: 2px;
+    margin-bottom: 4px;
+  }
+  #highlight-controls {
+    gap: 8px;
   }
   #highlight-controls button {
     width: 44px;
@@ -85,17 +92,19 @@
 <body>
 <div id="container">
   <canvas id="canvas"></canvas>
-  <div id="highlight-controls" class="btn-row">
+  <div id="highlight-section">
     <span class="hl-label">Highlight:</span>
+    <div id="highlight-controls" class="btn-row">
     <button data-digit="1">1</button>
     <button data-digit="4">4</button>
     <button data-digit="2">2</button>
     <button data-digit="8">8</button>
     <button data-digit="5">5</button>
     <button data-digit="7">7</button>
+    </div>
   </div>
   <div id="controls" class="btn-row">
-    <button id="btnMode">Mode: Multiply and Return</button>
+    <button id="btnMode">Multiply and Return</button>
     <button id="btnPause">Pause</button>
   </div>
 </div>
@@ -180,7 +189,7 @@
     [8, 5, 7, 1, 4, 2],
   ];
   const LABELS = [
-    "Starting Sequence: 142857",
+    "Initial Order: 142857",
     "Multiplication 1: 285714",
     "Multiplication 2: 428571",
     "Multiplication 3: 571428",
@@ -245,7 +254,7 @@
     phase = 0;
     phaseStart = performance.now();
     pauseElapsed = 0;
-    btnMode.textContent = "Mode: " + MODE_NAMES[mode];
+    btnMode.textContent = MODE_NAMES[mode];
   });
 
   btnPause.addEventListener("click", () => {
@@ -385,7 +394,7 @@
 
     // Mode label
     ctx.font = modeFont;
-    ctx.fillText("Mode: " + MODE_NAMES[mode], W / 2, H * 0.13);
+    ctx.fillText(MODE_NAMES[mode], W / 2, H * 0.13);
 
     // Paused indicator
     if (paused) {
