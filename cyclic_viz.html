@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>142857 Cyclic Permutations</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    font-family: monospace;
+    overflow: hidden;
+  }
+  canvas { display: block; }
+  #controls {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 12px;
+  }
+  #controls button {
+    background: #222;
+    color: #fff;
+    border: 1px solid #555;
+    padding: 8px 18px;
+    font-family: monospace;
+    font-size: 14px;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+  #controls button:hover {
+    background: #444;
+  }
+  #controls button.active {
+    border-color: #fff;
+  }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="controls">
+  <button id="btnMode">Mode: Multiply and Return</button>
+  <button id="btnPause">Pause</button>
+</div>
+<script>
+(() => {
+  // ── Canvas setup ──────────────────────────────────────────────────────
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  const W = 800, H = 600;
+  canvas.width = W;
+  canvas.height = H;
+
+  // ── Layout ────────────────────────────────────────────────────────────
+  const TOP_Y = 140;
+  const BOTTOM_Y = 460;
+  const RADIUS = 30;
+  const X_POSITIONS = [];
+  for (let i = 0; i < 6; i++) X_POSITIONS.push(Math.floor(W / 7 * (i + 1)));
+
+  // ── Timing (ms) ───────────────────────────────────────────────────────
+  const HOLD_MS = 3000;
+  const MOVE_MS = 3000;
+
+  // ── Sequence data ─────────────────────────────────────────────────────
+  const START = [1, 4, 2, 8, 5, 7];
+  const ALL_ORDERS = [
+    [1, 4, 2, 8, 5, 7],
+    [2, 8, 5, 7, 1, 4],
+    [4, 2, 8, 5, 7, 1],
+    [5, 7, 1, 4, 2, 8],
+    [7, 1, 4, 2, 8, 5],
+    [8, 5, 7, 1, 4, 2],
+  ];
+  const LABELS = [
+    "Starting Sequence: 142857",
+    "Multiplication 1: 285714",
+    "Multiplication 2: 428571",
+    "Multiplication 3: 571428",
+    "Multiplication 4: 714285",
+    "Multiplication 5: 857142",
+  ];
+  const MODE_NAMES = ["Multiply and Return", "Continuous Multiplication"];
+
+  // ── Helpers ───────────────────────────────────────────────────────────
+  function easeInOut(t) { return 0.5 - 0.5 * Math.cos(Math.PI * t); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function digitCol(digit, order) { return order.indexOf(digit); }
+  function yFor(pos) { return pos === "top" ? TOP_Y : BOTTOM_Y; }
+
+  // ── Phase builders ────────────────────────────────────────────────────
+  function buildMultiplyAndReturn() {
+    const phases = [];
+    for (let m = 0; m < 5; m++) {
+      phases.push({ type: "hold", order: 0, at: "top" });
+      phases.push({ type: "move", fromOrder: 0, toOrder: m + 1, fromY: "top", toY: "bottom" });
+      phases.push({ type: "hold", order: m + 1, at: "bottom" });
+      phases.push({ type: "move", fromOrder: m + 1, toOrder: 0, fromY: "bottom", toY: "top" });
+    }
+    return phases;
+  }
+
+  function buildContinuous() {
+    const stops = [
+      [0, "top"], [1, "bottom"], [2, "top"],
+      [3, "bottom"], [4, "top"], [5, "bottom"],
+    ];
+    const phases = [];
+    for (let i = 0; i < stops.length; i++) {
+      const [orderIdx, pos] = stops[i];
+      const [nextOrderIdx, nextPos] = stops[(i + 1) % stops.length];
+      phases.push({ type: "hold", order: orderIdx, at: pos });
+      phases.push({ type: "move", fromOrder: orderIdx, toOrder: nextOrderIdx, fromY: pos, toY: nextPos });
+    }
+    return phases;
+  }
+
+  function labelForPhase(p) {
+    return p.type === "hold" ? LABELS[p.order] : LABELS[p.toOrder];
+  }
+
+  // ── State ─────────────────────────────────────────────────────────────
+  const phaseTables = [buildMultiplyAndReturn(), buildContinuous()];
+  let mode = 0;
+  let phase = 0;
+  let phaseStart = performance.now();
+  let paused = false;
+  let pauseElapsed = 0;
+
+  // ── Controls ──────────────────────────────────────────────────────────
+  const btnMode = document.getElementById("btnMode");
+  const btnPause = document.getElementById("btnPause");
+
+  btnMode.addEventListener("click", () => {
+    mode = 1 - mode;
+    phase = 0;
+    phaseStart = performance.now();
+    pauseElapsed = 0;
+    btnMode.textContent = "Mode: " + MODE_NAMES[mode];
+  });
+
+  btnPause.addEventListener("click", () => {
+    if (paused) {
+      phaseStart = performance.now() - pauseElapsed;
+      paused = false;
+      btnPause.textContent = "Pause";
+    } else {
+      pauseElapsed = performance.now() - phaseStart;
+      paused = true;
+      btnPause.textContent = "Resume";
+    }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "m" || e.key === "M") btnMode.click();
+    else if (e.key === " ") { e.preventDefault(); btnPause.click(); }
+  });
+
+  // ── Drawing ───────────────────────────────────────────────────────────
+  function drawCircle(digit, cx, cy) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, RADIUS, 0, Math.PI * 2);
+    ctx.fillStyle = "#fff";
+    ctx.fill();
+
+    ctx.fillStyle = "#000";
+    ctx.font = "bold 28px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(digit), cx, cy);
+  }
+
+  // ── Main loop ─────────────────────────────────────────────────────────
+  function frame(now) {
+    const phases = phaseTables[mode];
+
+    // Timing
+    let elapsed = paused ? pauseElapsed : now - phaseStart;
+    let phaseInfo = phases[phase];
+    let dur = phaseInfo.type === "hold" ? HOLD_MS : MOVE_MS;
+
+    if (!paused && elapsed >= dur) {
+      phase = (phase + 1) % phases.length;
+      phaseStart = now;
+      elapsed = 0;
+      phaseInfo = phases[phase];
+      dur = phaseInfo.type === "hold" ? HOLD_MS : MOVE_MS;
+    }
+
+    const t = Math.min(elapsed / dur, 1.0);
+
+    // Compute positions
+    const positions = [];
+    if (phaseInfo.type === "hold") {
+      const order = ALL_ORDERS[phaseInfo.order];
+      const cy = yFor(phaseInfo.at);
+      for (const digit of START) {
+        positions.push([X_POSITIONS[digitCol(digit, order)], cy]);
+      }
+    } else {
+      const fromOrder = ALL_ORDERS[phaseInfo.fromOrder];
+      const toOrder = ALL_ORDERS[phaseInfo.toOrder];
+      const fromCy = yFor(phaseInfo.fromY);
+      const toCy = yFor(phaseInfo.toY);
+      const e = easeInOut(t);
+      for (const digit of START) {
+        const fc = digitCol(digit, fromOrder);
+        const tc = digitCol(digit, toOrder);
+        positions.push([
+          lerp(X_POSITIONS[fc], X_POSITIONS[tc], e),
+          lerp(fromCy, toCy, e),
+        ]);
+      }
+    }
+
+    // ── Draw ──────────────────────────────────────────────────────────
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, W, H);
+
+    // Guide lines
+    ctx.strokeStyle = "#1e1e1e";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(X_POSITIONS[0] - 50, TOP_Y);
+    ctx.lineTo(X_POSITIONS[5] + 50, TOP_Y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(X_POSITIONS[0] - 50, BOTTOM_Y);
+    ctx.lineTo(X_POSITIONS[5] + 50, BOTTOM_Y);
+    ctx.stroke();
+
+    // Circles
+    for (let i = 0; i < START.length; i++) {
+      drawCircle(START[i], positions[i][0], positions[i][1]);
+    }
+
+    // Sequence label
+    const label = labelForPhase(phaseInfo);
+    ctx.fillStyle = "#fff";
+    ctx.font = "20px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, W / 2, 40);
+
+    // Mode label
+    ctx.fillText("Mode: " + MODE_NAMES[mode], W / 2, 70);
+
+    // Paused indicator
+    if (paused) {
+      ctx.fillText("PAUSED", W / 2, H / 2);
+    }
+
+    // Keyboard hints
+    ctx.fillStyle = "#787878";
+    ctx.font = "14px monospace";
+    ctx.fillText("[M] Switch Mode    [SPACE] Pause/Resume", W / 2, H - 50);
+
+    requestAnimationFrame(frame);
+  }
+
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
