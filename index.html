@@ -118,9 +118,8 @@
   // Layout values derived from canvas size (recalculated on resize)
   let W, H, dpr;
   let topY, bottomY, radius, xPositions;
-  let labelFont, modeFont, hintFont, digitFont;
+  let labelFont, modeFont, digitFont;
   let guideMargin;
-  let isMobile = false;
 
   function recalcLayout() {
     dpr = window.devicePixelRatio || 1;
@@ -168,10 +167,7 @@
     // Font sizes proportional to width (keeps text consistent with circle size)
     labelFont = Math.max(Math.floor(W * 0.038), 12) + "px monospace";
     modeFont = Math.max(Math.floor(W * 0.038), 12) + "px monospace";
-    hintFont = Math.max(Math.floor(W * 0.026), 10) + "px monospace";
     digitFont = "bold " + Math.max(Math.floor(radius * 1.1), 12) + "px monospace";
-
-    isMobile = window.innerWidth < 600;
   }
 
   // ── Timing (ms) ───────────────────────────────────────────────────────
@@ -402,12 +398,6 @@
       ctx.fillText("PAUSED", W / 2, H / 2);
     }
 
-    // Keyboard hints (desktop only)
-    if (!isMobile) {
-      ctx.fillStyle = "#787878";
-      ctx.font = hintFont;
-      ctx.fillText("[M] Mode  [SPACE] Pause  [1-8] Highlight  [H] Clear", W / 2, H * 0.93);
-    }
 
     requestAnimationFrame(frame);
   }
