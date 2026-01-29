@@ -40,10 +40,56 @@
   #controls button.active {
     border-color: #fff;
   }
+  #highlight-controls {
+    position: fixed;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  #highlight-controls .hl-label {
+    color: #787878;
+    font-size: 13px;
+    margin-right: 4px;
+  }
+  #highlight-controls button {
+    background: #222;
+    color: #fff;
+    border: 1px solid #555;
+    width: 36px;
+    height: 36px;
+    font-family: monospace;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 50%;
+    padding: 0;
+    line-height: 36px;
+    text-align: center;
+  }
+  #highlight-controls button:hover {
+    background: #444;
+  }
+  #highlight-controls button.hl-active {
+    background: #c8b200;
+    color: #000;
+    border-color: #ffdd00;
+  }
 </style>
 </head>
 <body>
 <canvas id="canvas"></canvas>
+<div id="highlight-controls">
+  <span class="hl-label">Highlight:</span>
+  <button data-digit="1">1</button>
+  <button data-digit="4">4</button>
+  <button data-digit="2">2</button>
+  <button data-digit="8">8</button>
+  <button data-digit="5">5</button>
+  <button data-digit="7">7</button>
+</div>
 <div id="controls">
   <button id="btnMode">Mode: Multiply and Return</button>
   <button id="btnPause">Pause</button>
@@ -132,10 +178,12 @@
   let phaseStart = performance.now();
   let paused = false;
   let pauseElapsed = 0;
+  let highlightDigit = null; // null = off, or one of 1,4,2,8,5,7
 
   // ── Controls ──────────────────────────────────────────────────────────
   const btnMode = document.getElementById("btnMode");
   const btnPause = document.getElementById("btnPause");
+  const hlButtons = document.querySelectorAll("#highlight-controls button[data-digit]");
 
   btnMode.addEventListener("click", () => {
     mode = 1 - mode;
@@ -157,16 +205,39 @@
     }
   });
 
+  function updateHlButtons() {
+    hlButtons.forEach(btn => {
+      const d = parseInt(btn.dataset.digit);
+      btn.classList.toggle("hl-active", d === highlightDigit);
+    });
+  }
+
+  hlButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const d = parseInt(btn.dataset.digit);
+      highlightDigit = (highlightDigit === d) ? null : d;
+      updateHlButtons();
+    });
+  });
+
   document.addEventListener("keydown", (e) => {
     if (e.key === "m" || e.key === "M") btnMode.click();
     else if (e.key === " ") { e.preventDefault(); btnPause.click(); }
+    else if (e.key === "h" || e.key === "H") { highlightDigit = null; updateHlButtons(); }
+    else {
+      const num = parseInt(e.key);
+      if ([1,4,2,8,5,7].includes(num)) {
+        highlightDigit = (highlightDigit === num) ? null : num;
+        updateHlButtons();
+      }
+    }
   });
 
   // ── Drawing ───────────────────────────────────────────────────────────
-  function drawCircle(digit, cx, cy) {
+  function drawCircle(digit, cx, cy, highlighted) {
     ctx.beginPath();
     ctx.arc(cx, cy, RADIUS, 0, Math.PI * 2);
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = highlighted ? "#ffdd00" : "#fff";
     ctx.fill();
 
     ctx.fillStyle = "#000";
@@ -237,7 +308,7 @@
 
     // Circles
     for (let i = 0; i < START.length; i++) {
-      drawCircle(START[i], positions[i][0], positions[i][1]);
+      drawCircle(START[i], positions[i][0], positions[i][1], START[i] === highlightDigit);
     }
 
     // Sequence label
@@ -259,7 +330,7 @@
     // Keyboard hints
     ctx.fillStyle = "#787878";
     ctx.font = "14px monospace";
-    ctx.fillText("[M] Switch Mode    [SPACE] Pause/Resume", W / 2, H - 50);
+    ctx.fillText("[M] Mode  [SPACE] Pause  [1-8] Highlight  [H] Clear", W / 2, H - 50);
 
     requestAnimationFrame(frame);
   }
