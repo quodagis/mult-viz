@@ -125,9 +125,8 @@
     const availW = container.clientWidth - pad;
     const availH = container.clientHeight - btnHeight - pad;
 
-    // Canvas logical size: fit within available area, maintain 4:3 aspect
-    // but on narrow screens just fill width and compute height
-    const aspect = 4 / 3;
+    // Canvas logical size: fit within available area, maintain 3:4 aspect
+    const aspect = 3 / 4;
     if (availW / availH < aspect) {
       W = Math.floor(availW);
       H = Math.floor(W / aspect);
@@ -136,8 +135,8 @@
       W = Math.floor(H * aspect);
     }
     // Ensure minimum usable size
-    W = Math.max(W, 280);
-    H = Math.max(H, 210);
+    W = Math.max(W, 210);
+    H = Math.max(H, 280);
 
     // Set canvas CSS size and backing buffer for sharp rendering
     canvas.style.width = W + "px";
@@ -157,11 +156,10 @@
       xPositions.push(Math.floor(W / 7 * (i + 1)));
     }
 
-    // Font sizes proportional to canvas
-    const base = Math.min(W, H);
-    labelFont = Math.max(Math.floor(base * 0.038), 12) + "px monospace";
-    modeFont = Math.max(Math.floor(base * 0.038), 12) + "px monospace";
-    hintFont = Math.max(Math.floor(base * 0.026), 10) + "px monospace";
+    // Font sizes proportional to width (keeps text consistent with circle size)
+    labelFont = Math.max(Math.floor(W * 0.038), 12) + "px monospace";
+    modeFont = Math.max(Math.floor(W * 0.038), 12) + "px monospace";
+    hintFont = Math.max(Math.floor(W * 0.026), 10) + "px monospace";
     digitFont = "bold " + Math.max(Math.floor(radius * 1.1), 12) + "px monospace";
 
     isMobile = window.innerWidth < 600;
