@@ -2,75 +2,78 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>142857 Cyclic Permutations</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
+  html, body {
     background: #000;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
+    height: 100%;
     font-family: monospace;
     overflow: hidden;
   }
-  canvas { display: block; }
-  #controls {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
+  body {
     display: flex;
-    gap: 12px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
   }
-  #controls button {
+  #container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 8px;
+  }
+  canvas {
+    display: block;
+    flex-shrink: 1;
+  }
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    padding: 6px 0;
+  }
+  .btn-row button {
     background: #222;
     color: #fff;
     border: 1px solid #555;
-    padding: 8px 18px;
     font-family: monospace;
-    font-size: 14px;
     cursor: pointer;
     border-radius: 4px;
+    -webkit-tap-highlight-color: transparent;
   }
-  #controls button:hover {
+  .btn-row button:hover {
     background: #444;
   }
-  #controls button.active {
-    border-color: #fff;
+  #controls button {
+    padding: 10px 20px;
+    font-size: 15px;
+    min-height: 44px;
   }
   #highlight-controls {
-    position: fixed;
-    bottom: 60px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
     gap: 8px;
-    align-items: center;
   }
   #highlight-controls .hl-label {
     color: #787878;
     font-size: 13px;
-    margin-right: 4px;
+    margin-right: 2px;
   }
   #highlight-controls button {
-    background: #222;
-    color: #fff;
-    border: 1px solid #555;
-    width: 36px;
-    height: 36px;
-    font-family: monospace;
-    font-size: 16px;
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
     font-weight: bold;
-    cursor: pointer;
     border-radius: 50%;
     padding: 0;
-    line-height: 36px;
+    line-height: 44px;
     text-align: center;
-  }
-  #highlight-controls button:hover {
-    background: #444;
   }
   #highlight-controls button.hl-active {
     background: #c8b200;
@@ -80,35 +83,89 @@
 </style>
 </head>
 <body>
-<canvas id="canvas"></canvas>
-<div id="highlight-controls">
-  <span class="hl-label">Highlight:</span>
-  <button data-digit="1">1</button>
-  <button data-digit="4">4</button>
-  <button data-digit="2">2</button>
-  <button data-digit="8">8</button>
-  <button data-digit="5">5</button>
-  <button data-digit="7">7</button>
-</div>
-<div id="controls">
-  <button id="btnMode">Mode: Multiply and Return</button>
-  <button id="btnPause">Pause</button>
+<div id="container">
+  <canvas id="canvas"></canvas>
+  <div id="highlight-controls" class="btn-row">
+    <span class="hl-label">Highlight:</span>
+    <button data-digit="1">1</button>
+    <button data-digit="4">4</button>
+    <button data-digit="2">2</button>
+    <button data-digit="8">8</button>
+    <button data-digit="5">5</button>
+    <button data-digit="7">7</button>
+  </div>
+  <div id="controls" class="btn-row">
+    <button id="btnMode">Mode: Multiply and Return</button>
+    <button id="btnPause">Pause</button>
+  </div>
 </div>
 <script>
 (() => {
-  // ── Canvas setup ──────────────────────────────────────────────────────
+  // ── Canvas & responsive layout ────────────────────────────────────────
   const canvas = document.getElementById("canvas");
   const ctx = canvas.getContext("2d");
-  const W = 800, H = 600;
-  canvas.width = W;
-  canvas.height = H;
+  const container = document.getElementById("container");
 
-  // ── Layout ────────────────────────────────────────────────────────────
-  const TOP_Y = 140;
-  const BOTTOM_Y = 460;
-  const RADIUS = 30;
-  const X_POSITIONS = [];
-  for (let i = 0; i < 6; i++) X_POSITIONS.push(Math.floor(W / 7 * (i + 1)));
+  // Layout values derived from canvas size (recalculated on resize)
+  let W, H, dpr;
+  let topY, bottomY, radius, xPositions;
+  let labelFont, modeFont, hintFont, digitFont;
+  let guideMargin;
+  let isMobile = false;
+
+  function recalcLayout() {
+    dpr = window.devicePixelRatio || 1;
+
+    // Measure available space (container minus button rows)
+    const btns = container.querySelectorAll(".btn-row");
+    let btnHeight = 0;
+    btns.forEach(el => { btnHeight += el.offsetHeight; });
+
+    const pad = 16;
+    const availW = container.clientWidth - pad;
+    const availH = container.clientHeight - btnHeight - pad;
+
+    // Canvas logical size: fit within available area, maintain 4:3 aspect
+    // but on narrow screens just fill width and compute height
+    const aspect = 4 / 3;
+    if (availW / availH < aspect) {
+      W = Math.floor(availW);
+      H = Math.floor(W / aspect);
+    } else {
+      H = Math.floor(availH);
+      W = Math.floor(H * aspect);
+    }
+    // Ensure minimum usable size
+    W = Math.max(W, 280);
+    H = Math.max(H, 210);
+
+    // Set canvas CSS size and backing buffer for sharp rendering
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    canvas.width = Math.floor(W * dpr);
+    canvas.height = Math.floor(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // Derive layout from logical canvas size
+    topY = H * 0.23;
+    bottomY = H * 0.77;
+    radius = Math.max(W * 0.038, 16);
+    guideMargin = W * 0.06;
+
+    xPositions = [];
+    for (let i = 0; i < 6; i++) {
+      xPositions.push(Math.floor(W / 7 * (i + 1)));
+    }
+
+    // Font sizes proportional to canvas
+    const base = Math.min(W, H);
+    labelFont = Math.max(Math.floor(base * 0.038), 12) + "px monospace";
+    modeFont = Math.max(Math.floor(base * 0.038), 12) + "px monospace";
+    hintFont = Math.max(Math.floor(base * 0.026), 10) + "px monospace";
+    digitFont = "bold " + Math.max(Math.floor(radius * 1.1), 12) + "px monospace";
+
+    isMobile = window.innerWidth < 600;
+  }
 
   // ── Timing (ms) ───────────────────────────────────────────────────────
   const HOLD_MS = 3000;
@@ -138,7 +195,7 @@
   function easeInOut(t) { return 0.5 - 0.5 * Math.cos(Math.PI * t); }
   function lerp(a, b, t) { return a + (b - a) * t; }
   function digitCol(digit, order) { return order.indexOf(digit); }
-  function yFor(pos) { return pos === "top" ? TOP_Y : BOTTOM_Y; }
+  function yFor(pos) { return pos === "top" ? topY : bottomY; }
 
   // ── Phase builders ────────────────────────────────────────────────────
   function buildMultiplyAndReturn() {
@@ -178,7 +235,7 @@
   let phaseStart = performance.now();
   let paused = false;
   let pauseElapsed = 0;
-  let highlightDigit = null; // null = off, or one of 1,4,2,8,5,7
+  let highlightDigit = null;
 
   // ── Controls ──────────────────────────────────────────────────────────
   const btnMode = document.getElementById("btnMode");
@@ -236,16 +293,25 @@
   // ── Drawing ───────────────────────────────────────────────────────────
   function drawCircle(digit, cx, cy, highlighted) {
     ctx.beginPath();
-    ctx.arc(cx, cy, RADIUS, 0, Math.PI * 2);
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
     ctx.fillStyle = highlighted ? "#ffdd00" : "#fff";
     ctx.fill();
 
     ctx.fillStyle = "#000";
-    ctx.font = "bold 28px monospace";
+    ctx.font = digitFont;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(String(digit), cx, cy);
   }
+
+  // ── Resize handling ───────────────────────────────────────────────────
+  let resizeTimer;
+  function onResize() {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(recalcLayout, 50);
+  }
+  window.addEventListener("resize", onResize);
+  recalcLayout();
 
   // ── Main loop ─────────────────────────────────────────────────────────
   function frame(now) {
@@ -272,7 +338,7 @@
       const order = ALL_ORDERS[phaseInfo.order];
       const cy = yFor(phaseInfo.at);
       for (const digit of START) {
-        positions.push([X_POSITIONS[digitCol(digit, order)], cy]);
+        positions.push([xPositions[digitCol(digit, order)], cy]);
       }
     } else {
       const fromOrder = ALL_ORDERS[phaseInfo.fromOrder];
@@ -284,7 +350,7 @@
         const fc = digitCol(digit, fromOrder);
         const tc = digitCol(digit, toOrder);
         positions.push([
-          lerp(X_POSITIONS[fc], X_POSITIONS[tc], e),
+          lerp(xPositions[fc], xPositions[tc], e),
           lerp(fromCy, toCy, e),
         ]);
       }
@@ -298,12 +364,12 @@
     ctx.strokeStyle = "#1e1e1e";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(X_POSITIONS[0] - 50, TOP_Y);
-    ctx.lineTo(X_POSITIONS[5] + 50, TOP_Y);
+    ctx.moveTo(xPositions[0] - guideMargin, topY);
+    ctx.lineTo(xPositions[5] + guideMargin, topY);
     ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(X_POSITIONS[0] - 50, BOTTOM_Y);
-    ctx.lineTo(X_POSITIONS[5] + 50, BOTTOM_Y);
+    ctx.moveTo(xPositions[0] - guideMargin, bottomY);
+    ctx.lineTo(xPositions[5] + guideMargin, bottomY);
     ctx.stroke();
 
     // Circles
@@ -314,23 +380,27 @@
     // Sequence label
     const label = labelForPhase(phaseInfo);
     ctx.fillStyle = "#fff";
-    ctx.font = "20px monospace";
+    ctx.font = labelFont;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(label, W / 2, 40);
+    ctx.fillText(label, W / 2, H * 0.07);
 
     // Mode label
-    ctx.fillText("Mode: " + MODE_NAMES[mode], W / 2, 70);
+    ctx.font = modeFont;
+    ctx.fillText("Mode: " + MODE_NAMES[mode], W / 2, H * 0.13);
 
     // Paused indicator
     if (paused) {
+      ctx.font = labelFont;
       ctx.fillText("PAUSED", W / 2, H / 2);
     }
 
-    // Keyboard hints
-    ctx.fillStyle = "#787878";
-    ctx.font = "14px monospace";
-    ctx.fillText("[M] Mode  [SPACE] Pause  [1-8] Highlight  [H] Clear", W / 2, H - 50);
+    // Keyboard hints (desktop only)
+    if (!isMobile) {
+      ctx.fillStyle = "#787878";
+      ctx.font = hintFont;
+      ctx.fillText("[M] Mode  [SPACE] Pause  [1-8] Highlight  [H] Clear", W / 2, H * 0.93);
+    }
 
     requestAnimationFrame(frame);
   }
